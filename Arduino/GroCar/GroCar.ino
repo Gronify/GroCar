@@ -61,13 +61,13 @@ void controlSerial() {
 
       if (Serial.available() > 0) {
         inCharFromSerialPort = Serial.read();
-        if ((char)inCharFromSerialPort == "!"){
+        /*if ((char)inCharFromSerialPort == "!"){
           inStringFromSerialPort = "";
           Serial.read();
           Serial.read();
           serialEnd = true;
           controlSerialSend();
-          } 
+          }*/
         inStringFromSerialPort += (char)inCharFromSerialPort;
       }
       delay(2);
@@ -238,7 +238,6 @@ void RotationWheelsStop() {
   analogWrite(pwm1m, 0);
 
 }
-
 
 
 void MotorMoveForward() {

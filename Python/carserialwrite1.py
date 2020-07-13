@@ -5,7 +5,7 @@ import os
 
 
 serialArduino = serial.Serial(
-    port='/dev/ttyUSB0',
+    port='/dev/ttyUSB1',
     baudrate=115200,
     
 )
