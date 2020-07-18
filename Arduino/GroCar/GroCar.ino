@@ -1,9 +1,11 @@
 #include <Ultrasonic.h>
 #include <Servo.h>
 #include <DHT.h>
+#include <ArduinoJson.h>
 
+#define NULL (void)0
 Servo webcamservo;
-Ultrasonic ultrasonic( 4, 3 );//4 trig //3 echo
+Ultrasonic ultrasonic(4, 3); //4 trig //3 echo
 #define DHTPIN A3
 DHT dht(DHTPIN, DHT11);
 
@@ -19,317 +21,262 @@ int pinOfLedCar = 11;
 int temperatureAir;
 int HumidityAir;
 int distance;
-int inCharFromSerialPort;
+boolean temperatureChange;
+boolean HumidityChange;
+boolean distanceChange;
+char inCharFromSerialPort;
 String inStringFromSerialPort;
+String responseToSerialString;
 boolean needTemperature;
 boolean needHumidity;
 boolean needDistance;
 boolean lightCam;
 boolean lightCar;
-int directionOfMovement =  2;
+int directionOfMovement = 2;
 int directionOfRotationWheels = 2;
 int speedOfMovement;
-int directionOfRotationWebCamServo;
+int speedOfRotationWheels;
+int directionOfRotationWebCamServo = 90;
 
+int temp;
 boolean serialEnd;
-void setup() {
-  pinMode (pwm1m, OUTPUT);
-  pinMode (pwm2m, OUTPUT);
-  pinMode (pinOfMotorRotation1, OUTPUT);
-  pinMode (pinOfMotorRotation2, OUTPUT);
-  pinMode (pinOfMotorMove1, OUTPUT);
-  pinMode (pinOfMotorMove2, OUTPUT);
-  pinMode (pinOfLedCam, OUTPUT);
-  pinMode (pinOfLedCar, OUTPUT);
+StaticJsonDocument<256> requestFromSerial;
+StaticJsonDocument<256> responseToSerial;
+void setup()
+{
+  pinMode(pwm1m, OUTPUT);
+  pinMode(pwm2m, OUTPUT);
+  pinMode(pinOfMotorRotation1, OUTPUT);
+  pinMode(pinOfMotorRotation2, OUTPUT);
+  pinMode(pinOfMotorMove1, OUTPUT);
+  pinMode(pinOfMotorMove2, OUTPUT);
+  pinMode(pinOfLedCam, OUTPUT);
+  pinMode(pinOfLedCar, OUTPUT);
   // Serial.begin(9600);
   Serial.begin(115200);
   dht.begin();
   webcamservo.attach(12);
-
 }
 
-void loop() {
-  controlSerial();
+void loop()
+{
+  if (Serial.available() > 0)
+  {
+    readSerial();
+    writeSerial();
+  }
+  if ((temperatureChange && needTemperature) || (HumidityChange && needHumidity) || (distanceChange && needDistance))
+  {
+    writeSerial();
+  }
+  !needTemperature ? NULL : temperatureSensor();
+  !needHumidity ? NULL : humiditySensor();
+  !needDistance ? NULL : DistanceSensor();
 }
 
-void controlSerial() {
-
-  if (Serial.available() > 0) {
-    serialEnd = false;
-
-    while (!serialEnd) {
-
-      if (Serial.available() > 0) {
-        inCharFromSerialPort = Serial.read();
-        /*if ((char)inCharFromSerialPort == "!"){
-          inStringFromSerialPort = "";
-          Serial.read();
-          Serial.read();
-          serialEnd = true;
-          controlSerialSend();
-          }*/
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-      }
-      delay(2);
-
-      if (inStringFromSerialPort == "NT_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        needTemperature = (bool)inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-
-      if (inStringFromSerialPort == "NH_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        needHumidity = (bool)inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "ND_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        needDistance = (bool)inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "LCam_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        lightCam = (bool)inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "LCar_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        lightCar = (bool)inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "DM_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        directionOfMovement = inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "DR_") {
-        inStringFromSerialPort = "";
-        inCharFromSerialPort = Serial.read();
-        inStringFromSerialPort += (char)inCharFromSerialPort;
-        directionOfRotationWheels = inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-        Serial.read();
-      }
-      if (inStringFromSerialPort == "SM_") {
-        inStringFromSerialPort = "";
-        while ((char)inCharFromSerialPort != ';') {
-          inCharFromSerialPort = Serial.read();
-          inStringFromSerialPort += (char)inCharFromSerialPort;
-        }
-        speedOfMovement = inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-      }
-      if (inStringFromSerialPort == "DRS_") {
-
-        inStringFromSerialPort = "";
-        while ((char)inCharFromSerialPort != ';') {
-          inCharFromSerialPort = Serial.read();
-          inStringFromSerialPort += (char)inCharFromSerialPort;
-        }
-        directionOfRotationWebCamServo = inStringFromSerialPort.toInt();
-        inStringFromSerialPort = "";
-      }
-      if (inStringFromSerialPort == "R_OK!;\n") {
-        inStringFromSerialPort = "";
-        serialEnd = true;
-        controlSerialSend();
-      }
-
+void readSerial()
+{
+  serialEnd = false;
+  while (!serialEnd)
+  {
+    if (Serial.available() > 0)
+    {
+      inCharFromSerialPort = Serial.read();
+      inStringFromSerialPort += (char)inCharFromSerialPort;
+      serialEnd = (inCharFromSerialPort == '\n') ? true : false;
     }
+  }
 
+  deserializeJson(requestFromSerial, inStringFromSerialPort);
+  JsonObject object = requestFromSerial.as<JsonObject>();
 
+  if (requestFromSerial.containsKey("set"))
+  {
+    if (requestFromSerial["set"].containsKey("t"))
+    {
+      needTemperature = (bool)requestFromSerial["set"]["t"];
+    }
+    if (requestFromSerial["set"].containsKey("h"))
+    {
+      needHumidity = (bool)requestFromSerial["set"]["h"];
+    }
+    if (requestFromSerial["set"].containsKey("d"))
+    {
+      needDistance = (bool)requestFromSerial["set"]["d"];
+    }
+    if (requestFromSerial["set"].containsKey("lcam"))
+    {
+      lightCam = (bool)requestFromSerial["set"]["lcam"];
+      lightCamFun();
+    }
+    if (requestFromSerial["set"].containsKey("lcar"))
+    {
+      lightCar = (bool)requestFromSerial["set"]["lcar"];
+      lightCarFun();
+    }
+    if (requestFromSerial["set"].containsKey("sm"))
+    {
+      speedOfMovement = requestFromSerial["set"]["sm"];
+    }
+    if (requestFromSerial["set"].containsKey("sr"))
+    {
+      speedOfRotationWheels = requestFromSerial["set"]["sr"];
+    }
   }
-  if (needTemperature) {
-    temperatureSensor();
+  else if (requestFromSerial.containsKey("req"))
+  {
+    if (requestFromSerial["req"].containsKey("dm"))
+    {
+      directionOfMovement = requestFromSerial["req"]["dm"];
+      switch (directionOfMovement)
+      {
+      case 0:
+        MotorMoveForward();
+        break;
+      case 1:
+        MotorMoveBackward();
+        break;
+      default:
+        MotorMoveStop();
+        break;
+      }
+    }
+    if (requestFromSerial["req"].containsKey("dr"))
+    {
+      directionOfRotationWheels = requestFromSerial["req"]["dr"];
+      switch (directionOfRotationWheels)
+      {
+      case 0:
+        RotationWheelsLeft();
+        break;
+      case 1:
+        RotationWheelsRight();
+        break;
+      default:
+        RotationWheelsStop();
+        break;
+      }
+    }
+    if (requestFromSerial["req"].containsKey("drs"))
+    {
+      directionOfRotationWebCamServo = requestFromSerial["req"]["drs"];
+      WebCamServo();
+    }
   }
-  if (needHumidity) {
-    humiditySensor();
-  }
-  if (needDistance) {
-    DistanceSensor();
-  }
-  if (directionOfRotationWheels == 0) {
-    RotationWheelsLeft();
-  } else if (directionOfRotationWheels == 1) {
-    RotationWheelsRight();
-  } else {
-    RotationWheelsStop();
-  }
-  if (directionOfMovement == 0) {
-    MotorMoveForward();
-  } else if (directionOfMovement == 1) {
-    MotorMoveBackward();
-  } else {
-    MotorMoveStop();
-  }
-  lightCamFun();
-  lightCarFun();
-  WebCamServo();
+  inStringFromSerialPort = "";
 }
 
-void temperatureSensor() {
-  temperatureAir = dht.readTemperature();
-}
-void humiditySensor() {
-  HumidityAir = dht.readHumidity();
-}
-void DistanceSensor() {
-  distance = ultrasonic.Ranging(true);
-
-}
-void lightCamFun() {
-  if (lightCam) {
-    digitalWrite (pinOfLedCam, HIGH);
-  }
-  else {
-    digitalWrite (pinOfLedCam, LOW);
+void temperatureSensor()
+{
+  temp = dht.readTemperature();
+  if (temperatureAir != temp)
+  {
+    temperatureAir = temp;
+    temperatureChange = true;
   }
 }
-void lightCarFun() {
-  if (lightCar) {
-    digitalWrite (pinOfLedCar, HIGH);
+void humiditySensor()
+{
+  temp = dht.readHumidity();
+  if (HumidityAir != temp)
+  {
+    HumidityAir = temp;
+    HumidityChange = true;
   }
-  else {
-    digitalWrite (pinOfLedCar, LOW);
-
+}
+void DistanceSensor()
+{
+  temp = ultrasonic.Ranging(true);
+  if (distance != temp)
+  {
+    distance = temp;
+    distanceChange = true;
   }
 }
-
-
-void RotationWheelsLeft() {
-
-  digitalWrite (pinOfMotorRotation1, HIGH);
-  digitalWrite (pinOfMotorRotation2, LOW);
-  analogWrite(pwm1m, 255);
-
+void lightCamFun()
+{
+  lightCam ? digitalWrite(pinOfLedCam, HIGH) : digitalWrite(pinOfLedCam, LOW);
+}
+void lightCarFun()
+{
+  lightCar ? digitalWrite(pinOfLedCar, HIGH) : digitalWrite(pinOfLedCar, LOW);
 }
 
-void RotationWheelsRight() {
-
-  digitalWrite (pinOfMotorRotation1, LOW);
-  digitalWrite (pinOfMotorRotation2, HIGH);
-  analogWrite(pwm1m, 255);
-
+void RotationWheelsLeft()
+{
+  digitalWrite(pinOfMotorRotation1, HIGH);
+  digitalWrite(pinOfMotorRotation2, LOW);
+  analogWrite(pwm1m, speedOfRotationWheels);
 }
 
-void RotationWheelsStop() {
+void RotationWheelsRight()
+{
+  digitalWrite(pinOfMotorRotation1, LOW);
+  digitalWrite(pinOfMotorRotation2, HIGH);
+  analogWrite(pwm1m, speedOfRotationWheels);
+}
 
-  digitalWrite (pinOfMotorRotation1, LOW);
-  digitalWrite (pinOfMotorRotation2, LOW);
+void RotationWheelsStop()
+{
+  digitalWrite(pinOfMotorRotation1, LOW);
+  digitalWrite(pinOfMotorRotation2, LOW);
   analogWrite(pwm1m, 0);
-
 }
 
-
-void MotorMoveForward() {
-
-  digitalWrite (pinOfMotorMove1, HIGH);
-  digitalWrite (pinOfMotorMove2, LOW);
+void MotorMoveForward()
+{
+  digitalWrite(pinOfMotorMove1, HIGH);
+  digitalWrite(pinOfMotorMove2, LOW);
   analogWrite(pwm2m, speedOfMovement);
-
 }
 
-void MotorMoveBackward() {
-
-  digitalWrite (pinOfMotorMove1, LOW);
-  digitalWrite (pinOfMotorMove2, HIGH);
+void MotorMoveBackward()
+{
+  digitalWrite(pinOfMotorMove1, LOW);
+  digitalWrite(pinOfMotorMove2, HIGH);
   analogWrite(pwm2m, speedOfMovement);
-
 }
-void MotorMoveStop() {
 
-  digitalWrite (pinOfMotorMove1, LOW);
-  digitalWrite (pinOfMotorMove2, LOW);
+void MotorMoveStop()
+{
+  digitalWrite(pinOfMotorMove1, LOW);
+  digitalWrite(pinOfMotorMove2, LOW);
   analogWrite(pwm2m, 0);
-
 }
 
-void WebCamServo() {
-
+void WebCamServo()
+{
   webcamservo.write(directionOfRotationWebCamServo);
-
 }
-void controlSerialSend() {
-  Serial.print("T_");
-  if (needTemperature) {
-    Serial.print(temperatureAir);
-  } else {
-    Serial.print("Off");
+void writeSerial()
+{
+  responseToSerialString = "{ ";
+  if (temperatureChange && needTemperature)
+  {
+    temperatureChange = false;
+    responseToSerialString += String("\"t\":") + temperatureAir + ",";
   }
-  Serial.print(";");
-
-  Serial.print("H_");
-  if (needHumidity) {
-    Serial.print(HumidityAir);
-  } else {
-    Serial.print("Off");
+  if (HumidityChange && needHumidity)
+  {
+    HumidityChange = false;
+    responseToSerialString += String("\"h\":") + HumidityAir + ",";
   }
-  Serial.print(";");
-
-  Serial.print("D_");
-  if (needDistance) {
-    Serial.print(distance);
-  } else {
-    Serial.print("Off");
+  if (distanceChange && needDistance)
+  {
+    distanceChange = false;
+    responseToSerialString += String("\"d\":") + distance + ",";
   }
-  Serial.print(";");
 
-  Serial.print("LCam_");
-  if (lightCam) {
-    Serial.print("1");
-  } else {
-    Serial.print("0");
+  if (responseToSerialString[responseToSerialString.length() - 1] == ',')
+  {
+    responseToSerialString = responseToSerialString.substring(0, responseToSerialString.length() - 1);
   }
-  Serial.print(";");
 
-  Serial.print("LCar_");
-  if (lightCar) {
-    Serial.print("1");
-  } else {
-    Serial.print("0");
-  }
-  Serial.print(";");
+  responseToSerialString += "}";
+  responseToSerial.clear();
 
-  Serial.print("DM_");
-  Serial.print(directionOfMovement);
-  Serial.print(";");
-
-  Serial.print("DR_");
-  Serial.print(directionOfRotationWheels);
-  Serial.print(";");
-
-  Serial.print("SM_");
-  Serial.print(speedOfMovement);
-  Serial.print(";");
-
-  Serial.print("DRS_");
-  Serial.print(directionOfRotationWebCamServo);
-  Serial.print(";");
-
-  Serial.println("A_OK!;");
-
+  responseToSerial["data"] = serialized(responseToSerialString);
+  serializeJson(responseToSerial, Serial);
+  Serial.println();
 }
-
-
-
-
 
