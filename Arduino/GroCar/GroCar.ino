@@ -123,7 +123,7 @@ void readSerial()
       speedOfRotationWheels = requestFromSerial["set"]["sr"];
     }
   }
-  else if (requestFromSerial.containsKey("req"))
+  if (requestFromSerial.containsKey("req"))
   {
     if (requestFromSerial["req"].containsKey("dm"))
     {
@@ -277,6 +277,6 @@ void writeSerial()
 
   responseToSerial["data"] = serialized(responseToSerialString);
   serializeJson(responseToSerial, Serial);
-  Serial.println();
+  Serial.print('\n');
 }
 
