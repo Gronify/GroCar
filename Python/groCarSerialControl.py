@@ -40,11 +40,14 @@ if __name__ == "__main__":
       serialArduino.write(str.encode(str(jsonToSend)))
       serialArduino.write(str.encode('\n'))
     #############################################
-    oldJsonToSend = copy.deepcopy(jsonToSendBuff) 
-
-    with open('jsonSend.json') as json_file:
-      jsonToSendBuff = json.load(json_file)
-    jsonToSend = copy.deepcopy(jsonToSendBuff) 
+    oldJsonToSend = copy.deepcopy(jsonToSendBuff)
+    try:
+      with open('jsonSend.json') as json_file:
+        jsonToSendBuff = json.load(json_file)
+      jsonToSend = copy.deepcopy(jsonToSendBuff)
+    except:
+      jsonToSend = copy.deepcopy(oldJsonToSend)
+      
     for external_key in list(jsonToSend):
       if jsonToSend[external_key] == oldJsonToSend[external_key]:
         jsonToSend.pop(external_key)
@@ -53,14 +56,14 @@ if __name__ == "__main__":
         if jsonToSend[external_key][internal_key] == oldJsonToSend[external_key][internal_key]:
           jsonToSend[external_key].pop(internal_key)
     
-    time.sleep(0.5)
+    time.sleep(0.1)
     #Read json from Serial
     
     while serialArduino.inWaiting() > 0:
       jsonFromSerial = serialArduino.readline()
       print(jsonFromSerial.decode('utf-8'))
       f = open('jsonSerial.json', 'w')
-      f.write(str(jsonFromSerial))
+      f.write(jsonFromSerial.decode('utf-8'))
       f.close()
     
 
